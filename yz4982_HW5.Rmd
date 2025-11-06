@@ -92,7 +92,6 @@ sim_one <- function(mu) {
   td <- broom::tidy(tt)
   tibble(
     mu       = mu,
-    # sample mean
     estimate = td$estimate,
     pval     = td$p.value
   )
@@ -118,7 +117,7 @@ sum_tbl <- sim_res |>
   )
 ```
 
-Plot 1 Power vs true mean 
+Plot 1 power vs true mean 
 ```{r}
 p_power <- ggplot(sum_tbl, aes(x = mu, y = power)) +
   geom_line(linewidth = 1) +
