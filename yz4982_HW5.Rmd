@@ -3,3 +3,31 @@ title: "yz4982_HW5"
 output: github_document
 date: "2025-11-06"
 ---
+
+Problem 1
+------------------------------------------------------------
+### Library
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+
+
+Problem 2
+------------------------------------------------------------
+```{r}
+```
+
+
+
+Problem 3
+------------------------------------------------------------
+### Library
+```{r}
+
+url <- "https://raw.githubusercontent.com/washingtonpost/data-homicides/master/homicide-data.csv"
+hom <- readr::read_csv(url, show_col_types = FALSE)
+
+glimpse(hom)
+```
