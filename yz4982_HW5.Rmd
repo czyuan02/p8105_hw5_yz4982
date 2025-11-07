@@ -117,7 +117,7 @@ sum_tbl <- sim_res |>
   )
 ```
 
-Plot 1 power vs true mean 
+### Plot 1 power vs true mean 
 ```{r}
 p_power <- ggplot(sum_tbl, aes(x = mu, y = power)) +
   geom_line(linewidth = 1) +
@@ -135,8 +135,13 @@ p_power
 
 ggsave("figs/power_vs_mu.png",  p_power, width = 7, height = 5, dpi = 300)
 ```
+As the true mean μ moves away from 0, the effect becomes larger, the power (the proportion of times H0 is rejected) monotonically increases.
+When μ = 0, the power is 0.05, equal to the significance level.
+When μ is around 2, it is approaching half.
+When μ ≥ 3, it rapidly approaches 1.
+The larger the effect, the more the sample mean's distribution deviates from zero, making it easier to cross the threshold of the t-test, and thus more likely to be significant.
 
-Plot 2 Average hat mu vs true mean
+### Plot 2 Average hat mu vs true mean
 ```{r}
 plot_df <- sum_tbl |>
   select(mu,
@@ -164,14 +169,86 @@ p_means
 
 ggsave("figs/meanhat_vs_mu.png", p_means, width = 7, height = 5, dpi = 300)
 ```
+The curves of all samples are basically close to y = x, which indicates that the sample mean ̂μ is approximately unbiased with respect to μ. 
+Considering only the significant samples, the curve is above y = x when μ >0, not equal to the true μ. 
+Reason: By filtering based on "whether significant", it is equivalent to selecting "more extreme" samples from both ends of the sampling distribution, resulting in selection bias (winner's curse), leading to E[μ hat ∣reject] > μ, when μ > 0. 
+When μ is very large and the power is close to 1, almost all samples will be rejected, and the conditional filtering effect disappears, and the two curves will once again approach y = x. 
+So the average of only considering significant results μ hat does not equal the true μ, unless the power is approximately equal to 1, because the significance screening will systematically amplify the estimated value.
 
 Problem 3
 ------------------------------------------------------------
-### 
+### Import data
 ```{r}
+path <- "data/homicide-data.csv"
+homi_raw <- readr::read_csv(path, show_col_types = FALSE)
 
-url <- "https://raw.githubusercontent.com/washingtonpost/data-homicides/master/homicide-data.csv"
-hom <- readr::read_csv(url, show_col_types = FALSE)
+dim(homi_raw) 
+names(homi_raw)
+glimpse(homi_raw) 
+```
+Each row is one homicide case in a large U.S. city 52,179 rows, 12 columns, with fields for reported date, victim name/age/sex/race, city/state, latitude/longitude, and case disposition.
 
-glimpse(hom)
+### Generate "city_state" and summarize the "total number / number of unsolved cases" at the city level.
+```{r}
+homi <- homi_raw |>
+  mutate(
+    city_state = paste(city, state, sep = ", "),
+    unsolved   = disposition %in% c("Closed without arrest", "Open/No arrest")
+  )
+
+city_summary <- homi |>
+  group_by(city_state) |>
+  summarise(
+    total    = n(),
+    unsolved = sum(unsolved),
+    .groups  = "drop"
+  ) |>
+  arrange(desc(total))
+
+head(city_summary, 10)
+```
+
+Extract the estimated values and confidence intervals
+```{r}
+balt <- city_summary |> filter(city_state == "Baltimore, MD")
+
+# Number of successes = Number of unsolved cases
+balt_test <- prop.test(x = balt$unsolved, n = balt$total)
+balt_tidy <- broom::tidy(balt_test) |>
+  transmute(
+    city_state = "Baltimore, MD",
+    estimate, conf.low, conf.high
+  )
+
+balt_tidy
+```
+
+```{r}
+city_results <- city_summary |>
+  mutate(
+    test = purrr::map2(unsolved, total, ~ prop.test(.x, .y)),
+    tidy = purrr::map(test, broom::tidy)
+  ) |>
+  select(city_state, tidy) |>
+  unnest(tidy) |>
+  select(city_state, estimate, conf.low, conf.high) |>
+  arrange(estimate)
+
+head(city_results)
+```
+
+The proportion of unsolved cases in each city and the 95% confidence interval
+```{r}
+city_results |>
+  mutate(city_state = forcats::fct_reorder(city_state, estimate)) |>
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.15) +
+  coord_flip() +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Estimated proportion of unsolved homicides by city (95% CI)",
+    x = NULL, y = "Proportion unsolved"
+  ) +
+  theme_minimal(base_size = 14)
 ```
